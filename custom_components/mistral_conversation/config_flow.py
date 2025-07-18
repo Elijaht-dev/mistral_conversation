@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import voluptuous as vol
-from mistralai import Mistral
-from mistralai.exceptions import MistralAPIError
+from mistralai.client import MistralClient
+from mistralai.models.chat import ChatMessage
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY
@@ -46,10 +46,10 @@ class MistralConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 # Test the API key by making a simple request
-                client = Mistral(api_key=user_input[CONF_API_KEY])
-                await client.chat.create_async(
+                client = MistralClient(api_key=user_input[CONF_API_KEY])
+                await client.chat.create(
                     model=user_input[CONF_CHAT_MODEL],
-                    messages=[{"role": "user", "content": "Test"}],
+                    messages=[ChatMessage(role="user", content="Test")],
                     max_tokens=10
                 )
 
@@ -57,12 +57,12 @@ class MistralConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title="Mistral Conversation",
                     data=user_input,
                 )
-            except MistralAPIError as err:
-                LOGGER.error("Error validating API key: %s", err)
-                errors["base"] = "invalid_auth"
             except Exception as err:
-                LOGGER.error("Unexpected error: %s", err)
-                errors["base"] = "unknown"
+                LOGGER.error("Error validating API key: %s", err)
+                if "Unauthorized" in str(err):
+                    errors["base"] = "invalid_auth"
+                else:
+                    errors["base"] = "unknown"
 
         return self.async_show_form(
             step_id="user",

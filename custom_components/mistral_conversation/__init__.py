@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from mistralai import Mistral
+from mistralai.client import MistralClient
+from mistralai.models.chat import ChatMessage
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
@@ -36,8 +37,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Mistral Conversation from a config entry."""
-    # Create a persistent async Mistral client
-    mistral_client = Mistral(api_key=entry.data[CONF_API_KEY])
+    # Create a persistent Mistral client
+    mistral_client = MistralClient(api_key=entry.data[CONF_API_KEY])
     entry.runtime_data = mistral_client
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -57,16 +58,16 @@ async def send_prompt(call: ServiceCall) -> ServiceResponse:
             f"Config entry {entry_id} not found or not a Mistral Conversation entry"
         )
 
-    client: Mistral = entry.runtime_data
+    client: MistralClient = entry.runtime_data
     model = entry.data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
     prompt = call.data[CONF_PROMPT]
     max_tokens = entry.data.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
     temperature = entry.data.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
 
     try:
-        response = await client.chat.create_async(
+        response = await client.chat.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[ChatMessage(role="user", content=prompt)],
             max_tokens=max_tokens,
             temperature=temperature,
         )

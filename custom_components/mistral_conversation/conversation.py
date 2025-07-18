@@ -1,4 +1,8 @@
 """Conversation support for Mistral AI."""
+from __future__ import annotations
+
+from mistralai.client import MistralClient
+from mistralai.models.chat import ChatMessage
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
@@ -48,9 +52,15 @@ class MistralConversationEntity(conversation.ConversationEntity):
         messages.append({"role": "user", "content": user_input.text})
 
         try:
-            response = await client.chat.create_async(
+            # Convert messages to ChatMessage objects
+            chat_messages = [
+                ChatMessage(role=msg["role"], content=msg["content"]) 
+                for msg in messages
+            ]
+            
+            response = await client.chat.create(
                 model=model,
-                messages=messages,
+                messages=chat_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
