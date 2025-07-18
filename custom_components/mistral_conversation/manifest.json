@@ -1,7 +1,7 @@
 {
   "domain": "mistral_conversation",
   "name": "Mistral Conversation",
-  "version": "1.0.0",
+  "version": "0.0.2",
   "requirements": ["mistralai>=1.9.2"],
   "codeowners": ["@ELijaht-dev"],
   "config_flow": true,

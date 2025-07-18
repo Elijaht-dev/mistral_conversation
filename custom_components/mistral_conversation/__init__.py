@@ -29,13 +29,12 @@ SERVICE_GENERATE_CONTENT = "generate_content"
 PLATFORMS = (Platform.CONVERSATION,)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-type MistralConfigEntry = ConfigEntry[MistralClient]
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up Mistral Conversation."""
+    await async_setup_services(hass)
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: MistralConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Mistral Conversation from a config entry."""
     # Create a persistent async Mistral client
     mistral_client = Mistral(api_key=entry.data[CONF_API_KEY])
@@ -49,32 +48,36 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def send_prompt(call: ServiceCall) -> ServiceResponse:
     """Send a prompt to Mistral and return the response."""
+    hass = call.hass
     entry_id = call.data["config_entry"]
-    hass = call.hass if hasattr(call, "hass") else None
-    if hass is None:
-        raise HomeAssistantError("Home Assistant context not found in service call.")
+    
     entry = hass.config_entries.async_get_entry(entry_id)
-    if entry is None or entry.domain != DOMAIN:
+    if not entry or entry.domain != DOMAIN:
         raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="invalid_config_entry",
-            translation_placeholders={"config_entry": entry_id},
+            f"Config entry {entry_id} not found or not a Mistral Conversation entry"
         )
+
     client: Mistral = entry.runtime_data
     model = entry.data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
     prompt = call.data[CONF_PROMPT]
     max_tokens = entry.data.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
     temperature = entry.data.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+
     try:
-        response = await client.chat.complete_async(
+        response = await client.chat.create_async(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=temperature,
         )
+        
+        if not response.choices or not response.choices[0].message:
+            raise HomeAssistantError("Empty response from Mistral")
+            
+        return {"text": response.choices[0].message.content.strip()}
     except Exception as err:
+        LOGGER.error("Error generating content: %s", err)
         raise HomeAssistantError(f"Error generating content: {err}") from err
-    return {"text": response.choices[0].message.content}
 
 
 async def async_setup_services(hass: HomeAssistant):

@@ -1,7 +1,7 @@
 {
   "name": "Mistral Conversation",
   "filename": "mistral_conversation.zip",
-  "version": "1.0.0",
+  "version": "0.0.2",
   "repository": "https://github.com/Elijaht-dev/mistral_conversation",
   "homeassistant": "2025.7.2",
   "category": "integration",

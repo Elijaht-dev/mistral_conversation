@@ -30,28 +30,47 @@ class MistralConversationEntity(conversation.ConversationEntity):
         self._attr_unique_id = subentry.subentry_id
 
     async def _async_handle_message(self, user_input: conversation.ConversationInput, chat_log: conversation.ChatLog) -> conversation.ConversationResult:
+        """Process a sentence."""
         options = self.subentry.data
         client = self.entry.runtime_data
         model = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
-        prompt = user_input.text
         max_tokens = options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
         temperature = options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+
+        # Build the messages list from chat history
+        messages = []
+        if chat_log.messages and len(chat_log.messages) > 0:
+            for message in chat_log.messages[-5:]:  # Use last 5 messages for context
+                role = "assistant" if message.is_agent else "user"
+                messages.append({"role": role, "content": message.text})
+        
+        # Add the current message
+        messages.append({"role": "user", "content": user_input.text})
+
         try:
-            response = await client.chat.complete_async(
+            response = await client.chat.create_async(
                 model=model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+            LOGGER.debug("Mistral response: %s", response)
+            
+            if not response.choices or not response.choices[0].message:
+                raise HomeAssistantError("Empty response from Mistral")
+                
+            response_text = response.choices[0].message.content.strip()
+            
+            intent_response = conversation.IntentResponse(language=user_input.language)
+            intent_response.async_set_speech(response_text)
+            return conversation.ConversationResult(
+                response=intent_response,
+                conversation_id=chat_log.conversation_id,
+                continue_conversation=True,
+            )
         except Exception as err:
+            LOGGER.error("Error talking to Mistral: %s", err)
             raise HomeAssistantError(f"Error talking to Mistral: {err}") from err
-        intent_response = conversation.IntentResponse(language=user_input.language)
-        intent_response.async_set_speech(response.choices[0].message.content or "")
-        return conversation.ConversationResult(
-            response=intent_response,
-            conversation_id=chat_log.conversation_id,
-            continue_conversation=False,
-        )
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     for subentry in config_entry.subentries.values():
