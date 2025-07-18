@@ -1,0 +1,16 @@
+generate_content:
+  name: Generate Content
+  description: Send a prompt to Mistral AI and get a response.
+  fields:
+    config_entry:
+      description: The config entry ID for the integration.
+      required: true
+      selector:
+        config_entry:
+          integration: mistral_conversation
+    prompt:
+      description: The prompt to send to Mistral AI.
+      required: true
+      example: "Hello, who are you?"
+      selector:
+        text:
