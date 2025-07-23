@@ -1,11 +1,11 @@
 {
-  "domain": "mistral",
+  "domain": "mistral_conversation",
   "name": "Mistral Conversation",
   "after_dependencies": ["assist_pipeline", "intent"],
   "codeowners": ["@Elijaht-dev"],
   "config_flow": true,
   "dependencies": ["conversation"],
-  "documentation": "",
+  "documentation": "https://github.com/Elijaht-dev/mistral_conversation",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "requirements": ["mistralai==1.9.2"]
