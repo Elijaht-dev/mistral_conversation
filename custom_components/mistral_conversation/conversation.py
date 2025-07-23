@@ -3,6 +3,11 @@
 from typing import Iterable, Literal
 
 from homeassistant.components import conversation
+from homeassistant.components.conversation.models import (
+    ChatLog,
+    ChatMessage,
+    ConversationResult,
+)
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_LLM_HASS_API, MATCH_ALL
 from homeassistant.core import HomeAssistant
@@ -52,8 +57,8 @@ class MistralConversationEntity(
         return MATCH_ALL
 
     async def _async_handle_message(
-        self, user_input: conversation.ConversationInput, chat_log: conversation.ChatLog
-    ) -> conversation.ConversationResult:
+        self, user_input: conversation.ConversationInput, chat_log: ChatLog
+    ) -> ConversationResult:
         """Call the API."""
         options = self.subentry.data
 
@@ -71,8 +76,6 @@ class MistralConversationEntity(
 
         return conversation.async_get_result_from_chat_log(user_input, chat_log)
 
-    def _convert_messages(
-        self, messages: Iterable[conversation.ChatMessage]
-    ) -> list[conversation.ChatMessage]:
+    def _convert_messages(self, messages: Iterable[ChatMessage]) -> list[ChatMessage]:
         """Convert messages to a list of ChatMessage objects."""
         return list(messages)
