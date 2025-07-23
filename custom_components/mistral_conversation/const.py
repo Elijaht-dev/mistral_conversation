@@ -1,34 +1,26 @@
-"""Constants for the Mistral Conversation integration."""
-from __future__ import annotations
+"""Constants for the Mistral integration."""
 
 import logging
-from typing import Final
 
-DOMAIN: Final = "mistral_conversation"
-LOGGER: Final[logging.Logger] = logging.getLogger(__package__)
+DOMAIN = "mistral"
+LOGGER = logging.getLogger(__package__)
 
-DEFAULT_CONVERSATION_NAME = "Mistral Conversation"
-DEFAULT_NAME = "Mistral Conversation"
+DEFAULT_CONVERSATION_NAME = "Mistral conversation"
 
-# Configuration
-CONF_CHAT_MODEL = "chat_model"
-CONF_MAX_TOKENS = "max_tokens"
+CONF_RECOMMENDED = "recommended"
 CONF_PROMPT = "prompt"
-CONF_TEMPERATURE = "temperature"
-CONF_API_KEY = "api_key"
-
-# Models and defaults
+CONF_CHAT_MODEL = "chat_model"
 RECOMMENDED_CHAT_MODEL = "mistral-small-latest"
-RECOMMENDED_MAX_TOKENS = 1000
-RECOMMENDED_TEMPERATURE = 0.7
+CONF_MAX_TOKENS = "max_tokens"
+RECOMMENDED_MAX_TOKENS = 3000
+CONF_TEMPERATURE = "temperature"
+RECOMMENDED_TEMPERATURE = 1.0
+CONF_THINKING_BUDGET = "thinking_budget"
+RECOMMENDED_THINKING_BUDGET = 0
+MIN_THINKING_BUDGET = 1024
 
-AVAILABLE_MODELS = [
-    "mistral-tiny-latest",
-    "mistral-small-latest",
+THINKING_MODELS = [
+    "mistral-large-latest",
+    "mistral-large-2411",
     "mistral-medium-latest",
-    "mistral-large-latest"
 ]
-
-# Error messages
-ERROR_UNAUTHORIZED = "invalid_api_key"
-ERROR_UNKNOWN = "unknown"

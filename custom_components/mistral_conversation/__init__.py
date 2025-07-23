@@ -1,95 +1,182 @@
-"""The Mistral Conversation integration."""
+"""The Mistral integration."""
 
 from __future__ import annotations
 
-import logging
-from mistralai.client import MistralClient
-from mistralai.models.chat import ChatMessage
-import voluptuous as vol
+from functools import partial
 
-from homeassistant.config_entries import ConfigEntry
+import mistralai
+
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import CONF_API_KEY, Platform
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import config_validation as cv, selector
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONF_CHAT_MODEL,
-    CONF_MAX_TOKENS,
-    CONF_PROMPT,
-    CONF_TEMPERATURE,
+    DEFAULT_CONVERSATION_NAME,
     DOMAIN,
     LOGGER,
     RECOMMENDED_CHAT_MODEL,
-    RECOMMENDED_MAX_TOKENS,
-    RECOMMENDED_TEMPERATURE,
 )
 
-SERVICE_GENERATE_CONTENT = "generate_content"
 PLATFORMS = (Platform.CONVERSATION,)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
+type MistralConfigEntry = ConfigEntry[mistralai.Mistral]
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up Mistral Conversation."""
-    await async_setup_services(hass)
+    """Set up Mistral"""
+    await async_migrate_integration(hass)
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Mistral Conversation from a config entry."""
-    # Create a persistent Mistral client
-    mistral_client = MistralClient(api_key=entry.data[CONF_API_KEY])
-    entry.runtime_data = mistral_client
+
+async def async_setup_entry(hass: HomeAssistant, entry: MistralConfigEntry) -> bool:
+    """Set up Mistral from a config entry."""
+    client = await hass.async_add_executor_job(
+        partial(mistralai.Mistral, api_key=entry.data[CONF_API_KEY])
+    )
+    try:
+        # Use model from first conversation subentry for validation
+        subentries = list(entry.subentries.values())
+        if subentries:
+            model_id = subentries[0].data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
+        else:
+            model_id = RECOMMENDED_CHAT_MODEL
+        model = await hass.async_add_executor_job(
+            client.models.retrieve, model_id=model_id
+        )
+        LOGGER.debug("Mistral model: %s", model.id)
+    except mistralai.models.SDKError as err:
+        if err.status_code == 422:
+            LOGGER.error("HTTP Validation Error: %s", err.message)
+        else:
+            LOGGER.error("An error occurred while setting up the integration: %s", err)
+
+    entry.runtime_data = client
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
+
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload Mistral Conversation."""
+    """Unload Mistral."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-async def send_prompt(call: ServiceCall) -> ServiceResponse:
-    """Send a prompt to Mistral and return the response."""
-    hass = call.hass
-    entry_id = call.data["config_entry"]
-    
-    entry = hass.config_entries.async_get_entry(entry_id)
-    if not entry or entry.domain != DOMAIN:
-        raise ServiceValidationError(
-            f"Config entry {entry_id} not found or not a Mistral Conversation entry"
+
+async def async_update_options(
+    hass: HomeAssistant, entry: MistralConfigEntry
+) -> None:
+    """Update options."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_migrate_integration(hass: HomeAssistant) -> None:
+    """Migrate integration entry structure."""
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if not any(entry.version == 1 for entry in entries):
+        return
+
+    api_keys_entries: dict[str, ConfigEntry] = {}
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+
+    for entry in entries:
+        use_existing = False
+        subentry = ConfigSubentry(
+            data=entry.options,
+            subentry_type="conversation",
+            title=entry.title,
+            unique_id=None,
         )
+        if entry.data[CONF_API_KEY] not in api_keys_entries:
+            use_existing = True
+            api_keys_entries[entry.data[CONF_API_KEY]] = entry
 
-    client: MistralClient = entry.runtime_data
-    model = entry.data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
-    prompt = call.data[CONF_PROMPT]
-    max_tokens = entry.data.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
-    temperature = entry.data.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+        parent_entry = api_keys_entries[entry.data[CONF_API_KEY]]
 
-    try:
-        response = await client.chat.create(
-            model=model,
-            messages=[ChatMessage(role="user", content=prompt)],
-            max_tokens=max_tokens,
-            temperature=temperature,
+        hass.config_entries.async_add_subentry(parent_entry, subentry)
+        conversation_entity = entity_registry.async_get_entity_id(
+            "conversation",
+            DOMAIN,
+            entry.entry_id,
         )
-        
-        if not response.choices or not response.choices[0].message:
-            raise HomeAssistantError("Empty response from Mistral")
-            
-        return {"text": response.choices[0].message.content.strip()}
-    except Exception as err:
-        LOGGER.error("Error generating content: %s", err)
-        raise HomeAssistantError(f"Error generating content: {err}") from err
+        if conversation_entity is not None:
+            entity_registry.async_update_entity(
+                conversation_entity,
+                config_entry_id=parent_entry.entry_id,
+                config_subentry_id=subentry.subentry_id,
+                new_unique_id=subentry.subentry_id,
+            )
+
+        device = device_registry.async_get_device(
+            identifiers={(DOMAIN, entry.entry_id)}
+        )
+        if device is not None:
+            device_registry.async_update_device(
+                device.id,
+                new_identifiers={(DOMAIN, subentry.subentry_id)},
+                add_config_subentry_id=subentry.subentry_id,
+                add_config_entry_id=parent_entry.entry_id,
+            )
+            if parent_entry.entry_id != entry.entry_id:
+                device_registry.async_update_device(
+                    device.id,
+                    remove_config_entry_id=entry.entry_id,
+                )
+            else:
+                device_registry.async_update_device(
+                    device.id,
+                    remove_config_entry_id=entry.entry_id,
+                    remove_config_subentry_id=None,
+                )
+
+        if not use_existing:
+            await hass.config_entries.async_remove(entry.entry_id)
+        else:
+            hass.config_entries.async_update_entry(
+                entry,
+                title=DEFAULT_CONVERSATION_NAME,
+                options={},
+                version=2,
+                minor_version=2,
+            )
 
 
-async def async_setup_services(hass: HomeAssistant):
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_GENERATE_CONTENT,
-        send_prompt,
-        schema=vol.Schema({
-            vol.Required("config_entry"): selector.ConfigEntrySelector({"integration": DOMAIN}),
-            vol.Required(CONF_PROMPT): cv.string,
-        }),
-        supports_response=SupportsResponse.ONLY,
+async def async_migrate_entry(hass: HomeAssistant, entry: MistralConfigEntry) -> bool:
+    """Migrate entry."""
+    LOGGER.debug("Migrating from version %s:%s", entry.version, entry.minor_version)
+
+    if entry.version > 2:
+        # This means the user has downgraded from a future version
+        return False
+
+    if entry.version == 2 and entry.minor_version == 1:
+        # Correct broken device migration in Home Assistant Core 2025.7.0b0-2025.7.0b1
+        device_registry = dr.async_get(hass)
+        for device in dr.async_entries_for_config_entry(
+            device_registry, entry.entry_id
+        ):
+            device_registry.async_update_device(
+                device.id,
+                remove_config_entry_id=entry.entry_id,
+                remove_config_subentry_id=None,
+            )
+
+        hass.config_entries.async_update_entry(entry, minor_version=2)
+
+    LOGGER.debug(
+        "Migration to version %s:%s successful", entry.version, entry.minor_version
     )
 
+    return True
