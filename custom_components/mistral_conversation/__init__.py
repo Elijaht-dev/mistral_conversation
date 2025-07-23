@@ -50,7 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MistralConfigEntry) -> b
         else:
             model_id = RECOMMENDED_CHAT_MODEL
         model = await hass.async_add_executor_job(
-            client.models.retrieve, model_id=model_id
+            partial(client.models.retrieve, model_id=model_id)
         )
         LOGGER.debug("Mistral model: %s", model.id)
     except mistralai.models.SDKError as err:
