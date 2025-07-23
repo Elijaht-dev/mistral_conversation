@@ -1,14 +1,8 @@
 """Conversation support for Mistral"""
 
-from typing import Iterable, Literal
+from typing import Literal
 
 from homeassistant.components import conversation
-from homeassistant.components.conversation.models import (
-    ChatLog,
-    ChatMessage,
-    ConversationInput,
-    ConversationResult,
-)
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_LLM_HASS_API, MATCH_ALL
 from homeassistant.core import HomeAssistant
@@ -58,8 +52,10 @@ class MistralConversationEntity(
         return MATCH_ALL
 
     async def _async_handle_message(
-        self, user_input: ConversationInput, chat_log: ChatLog
-    ) -> ConversationResult:
+        self,
+        user_input: conversation.ConversationInput,
+        chat_log: conversation.ChatLog,
+    ) -> conversation.ConversationResult:
         """Call the API."""
         options = self.subentry.data
 
@@ -76,7 +72,3 @@ class MistralConversationEntity(
         await self._async_handle_chat_log(chat_log)
 
         return conversation.async_get_result_from_chat_log(user_input, chat_log)
-
-    def _convert_messages(self, messages: Iterable[ChatMessage]) -> list[ChatMessage]:
-        """Convert messages to a list of ChatMessage objects."""
-        return list(messages)
