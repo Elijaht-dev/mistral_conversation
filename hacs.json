@@ -1,6 +1,6 @@
 {
   "name": "Mistral Conversation",
-  "version": "0.0.3-dev",
+  "version": "0.0.4-dev",
   "repository": "https://github.com/Elijaht-dev/mistral_conversation",
   "homeassistant": "2025.7.3",
   "category": "integration",
