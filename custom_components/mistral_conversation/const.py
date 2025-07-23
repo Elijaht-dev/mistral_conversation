@@ -2,7 +2,7 @@
 
 import logging
 
-DOMAIN = "mistral_conversation"
+DOMAIN = "mistral"
 LOGGER = logging.getLogger(__package__)
 
 DEFAULT_CONVERSATION_NAME = "Mistral conversation"

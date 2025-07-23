@@ -1,5 +1,5 @@
 {
-  "domain": "mistral_conversation",
+  "domain": "mistral",
   "name": "Mistral Conversation",
   "after_dependencies": ["assist_pipeline", "intent"],
   "codeowners": ["@Elijaht-dev"],
