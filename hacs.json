@@ -2,7 +2,7 @@
   "name": "Mistral Conversation",
   "version": "0.0.3-dev",
   "repository": "https://github.com/Elijaht-dev/mistral_conversation",
-  "homeassistant": "2025.7.2",
+  "homeassistant": "2025.7.3",
   "category": "integration",
   "config_flow": true,
   "requirements": ["mistralai==1.9.2"]
