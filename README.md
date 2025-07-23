@@ -1,4 +1,4 @@
-# Mistral Conversation
+# Mistral Conversation (not functionnal)
 
 A Home Assistant custom integration that provides conversation/chat capabilities using Mistral AI's LLM models.
 
