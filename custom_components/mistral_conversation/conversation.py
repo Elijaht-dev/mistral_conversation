@@ -6,6 +6,7 @@ from homeassistant.components import conversation
 from homeassistant.components.conversation.models import (
     ChatLog,
     ChatMessage,
+    ConversationInput,
     ConversationResult,
 )
 from homeassistant.config_entries import ConfigSubentry
@@ -57,7 +58,7 @@ class MistralConversationEntity(
         return MATCH_ALL
 
     async def _async_handle_message(
-        self, user_input: conversation.ConversationInput, chat_log: ChatLog
+        self, user_input: ConversationInput, chat_log: ChatLog
     ) -> ConversationResult:
         """Call the API."""
         options = self.subentry.data
