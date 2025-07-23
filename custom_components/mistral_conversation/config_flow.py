@@ -68,7 +68,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
     client = await hass.async_add_executor_job(
         partial(mistralai.Mistral, api_key=data[CONF_API_KEY])
     )
-    await hass.async_add_executor_job(client.models.list, timeout=10.0)
+    await hass.async_add_executor_job(client.models.list)
 
 
 class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
